@@ -1,0 +1,15 @@
+Assets/SteamVR/
+Assets/ProBuilder Data/
+Assets/SteamVR_Input/
+Assets/SteamVR_Resources/
+Assets/StreamingAssets/
+Assets/XR/
+Builds/
+Library/
+Temp/
+Logs/Packages-Update.log
+obj/
+.vsconfig
+*.suo
+*.csproj
+*.sln
