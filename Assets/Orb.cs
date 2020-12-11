@@ -8,6 +8,8 @@ public class Orb : MonoBehaviour
 {
     public Hand leftHand;
     public Hand rightHand;
+
+    public Transform body;
     public ParticleSystem hitFX;
     public SteamVR_Action_Vibration haptic;
 
@@ -15,7 +17,7 @@ public class Orb : MonoBehaviour
     private Mesh mesh;
 
     private float sparkIntensity = 0.0f;
-    private float[] cooldownTime = {0.0f, 0.0f};
+    private float[] collideDist = {0.0f, 0.0f};
     private bool[] collideFlag = {false, false};
 
     // Start is called before the first frame update
@@ -26,14 +28,11 @@ public class Orb : MonoBehaviour
 
     void SetVertexColor(Color col) {
         Vector3[] vertices = mesh.vertices;
-
-        // create new colors array where the colors will be created.
         Color[] colors = new Color[vertices.Length];
 
         for (int i = 0; i < vertices.Length; i++)
             colors[i] = col;
 
-        // assign the array of colors to the Mesh.
         mesh.colors = colors;
     }
 
@@ -48,6 +47,10 @@ public class Orb : MonoBehaviour
 
         Vector3 velocity;
         Vector3 angularVelocity;
+        Vector3 bodyCenter = new Vector3(
+             body.position.x,
+             body.position.y - 1.3f, /* assumed shoulder height */
+             body.position.z); 
 
         for (int i = 0; i < 2; ++i) {
             float distance = Vector3.Distance(hands[i].transform.position, transform.position);
@@ -55,12 +58,12 @@ public class Orb : MonoBehaviour
             if (!collideFlag[i]) {
                 // collide check
                 float r = transform.localScale.x * 0.5f;
-                if (distance < r && cooldownTime[i] < Time.time) {
-
+                if (distance < r) {
+                    // fist is inside orb
                     hands[i].GetEstimatedPeakVelocities(out velocity, out angularVelocity);
                     float mag = velocity.magnitude;
                     float strength = Mathf.Clamp( (mag * mag + mag) * 0.3f, 0.0f, 1.0f );
-                    cooldownTime[i] = Time.time + (0.6f - strength * 0.3f);
+                    collideDist[i] = Vector3.Distance(bodyCenter, hands[i].transform.position);
 
                     sparkIntensity = strength * 1.0f;
                     collideFlag[i] = true;
@@ -79,9 +82,13 @@ public class Orb : MonoBehaviour
             } else {
                 // un-collide check
                 float r = transform.localScale.x * 0.5f;
-                if (distance > r) {
-                    collideFlag[i] = false;
-                 }
+                if (distance > r) {  
+                    // fist is outside of orb
+                    if (Vector3.Distance(bodyCenter, hands[i].transform.position) < collideDist[i]) {
+                        // and the was is returned back near to the body
+                        collideFlag[i] = false;
+                    }
+                }
             }
         }
 
