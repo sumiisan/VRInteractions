@@ -1,4 +1,4 @@
-﻿Shader "Custom/s_ColoredVertex"
+﻿Shader "Custom/s_CV_Orb"
 {
     Properties {
         _Color ("Color", Color) = (1,1,1,1)
@@ -6,11 +6,9 @@
     }
     SubShader {
         Tags { "Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent" }
-//        Tags { "RenderType"="Opaque" }
 
         ZWrite Off
         Blend SrcAlpha OneMinusSrcAlpha
-//      Cull front 
         LOD 200
 
         CGPROGRAM

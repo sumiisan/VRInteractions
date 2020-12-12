@@ -13,3 +13,4 @@ obj/
 *.suo
 *.csproj
 *.sln
+.vscode/settings.json

@@ -4,7 +4,7 @@ using UnityEngine;
 using Valve.VR;
 using Valve.VR.InteractionSystem;
 
-public class Orb : MonoBehaviour
+public class Orb : VertexColored
 {
     public Hand leftHand;
     public Hand rightHand;
@@ -14,26 +14,13 @@ public class Orb : MonoBehaviour
     public SteamVR_Action_Vibration haptic;
 
     private Vector3 origin;
-    private Mesh mesh;
-
     private float sparkIntensity = 0.0f;
     private float[] collideDist = {0.0f, 0.0f};
     private bool[] collideFlag = {false, false};
 
-    // Start is called before the first frame update
     void Start() {
-        origin = gameObject.transform.position;
-        mesh = GetComponent<MeshFilter>().mesh;
-    }
-
-    void SetVertexColor(Color col) {
-        Vector3[] vertices = mesh.vertices;
-        Color[] colors = new Color[vertices.Length];
-
-        for (int i = 0; i < vertices.Length; i++)
-            colors[i] = col;
-
-        mesh.colors = colors;
+        InitMesh(gameObject);
+        origin = transform.position;
     }
 
     void Vibrate(float strength, SteamVR_Input_Sources source) {
@@ -49,7 +36,7 @@ public class Orb : MonoBehaviour
         Vector3 angularVelocity;
         Vector3 bodyCenter = new Vector3(
              body.position.x,
-             body.position.y - 1.3f, /* assumed shoulder height */
+             body.position.y + 1.3f, /* assumed shoulder height */
              body.position.z); 
 
         for (int i = 0; i < 2; ++i) {
@@ -68,12 +55,14 @@ public class Orb : MonoBehaviour
                     sparkIntensity = strength * 1.0f;
                     collideFlag[i] = true;
                     Vibrate(strength, sources[i]);
-                    hitFX.startSpeed = strength;
+                    ParticleSystem.MainModule main = hitFX.main;
+                    main.startSpeed = strength;
+//                    hitFX.startSpeed = strength;
                     hitFX.Emit( (int)(strength * 30.0f) );
 
                     Vector3 move = new Vector3(
                         0.1f  * velocity.x, 
-                        0.03f * velocity.y,  // don't move horizontal so much
+                        0.05f * velocity.y,  // don't move horizontal so much
                         0.1f  * velocity.z
                         ); 
                     
