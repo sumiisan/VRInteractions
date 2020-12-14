@@ -4,12 +4,34 @@ using UnityEngine;
 using Valve.VR;
 using Valve.VR.InteractionSystem;
 
+
+public enum HandShape {
+    Fist,
+    Sword,
+    Staff,
+    SwordStaff,
+    Unknown,
+}
+
+public struct SmashInfo {
+    public bool smashing;
+    public int handIndex;
+    public HandShape shape;
+    public Vector3 posiion;
+    public Quaternion rotation;
+    public Vector3 smashVelocity;
+    public Vector3 sliceVelocity;
+}
+
+interface ISmashable {
+    void SmashHit(SmashInfo info);
+}
+
 public class Fist : VertexColored {
     Hand hand;
     int handIndex;
 
     public SteamVR_Action_Boolean grabPinchAction = SteamVR_Input.GetAction<SteamVR_Action_Boolean>("GrabPinch");
-
     public SteamVR_Action_Boolean grabGripAction = SteamVR_Input.GetAction<SteamVR_Action_Boolean>("GrabGrip");
 
     private const float zOffset = -0.07f;
@@ -20,7 +42,12 @@ public class Fist : VertexColored {
     private bool grabPinchActive = false;
     private bool grabGripActive = false;
 
+    public SphereCollider fistCollider;
+    public BoxCollider swordCollider;
+    public BoxCollider staffCollider;
+
     private SteamVR_Input_Sources inputSource = 0;
+    private HandShape handShape = HandShape.Fist;
 
     const float defaultFistRadius = 0.2f;
 
@@ -60,21 +87,35 @@ public class Fist : VertexColored {
     void Update() {
         float morphSpeed = 10.0f * Time.deltaTime;
 
-        if ( grabPinchActive && upLength < maxLength) {
-            upLength += morphSpeed; 
-        } else if ( upLength > 0.0f) {
-            upLength -= morphSpeed;
-            if (upLength < 0.0f)
-             upLength = 0.0f;
-        }  
+        upLength   += grabPinchActive ? morphSpeed : -morphSpeed;     
+        downLength += grabGripActive  ? morphSpeed : -morphSpeed;
 
-        if ( grabGripActive && downLength < maxLength) {
-            downLength += morphSpeed;
-        } else if ( downLength > 0.0f) {
-            downLength -= morphSpeed;
-            if (downLength < 0.0f)
-             downLength = 0.0f;
+        upLength   = Mathf.Clamp(upLength,   0.0f, maxLength); 
+        downLength = Mathf.Clamp(downLength, 0.0f, maxLength); 
+
+        HandShape lhs = handShape;
+
+        if (upLength > 0.3f) {
+            if (downLength > 0.3f) {
+                handShape = HandShape.SwordStaff;
+            } else {
+                handShape = HandShape.Sword;
+            } 
+        } else {
+            if (downLength > 0.3f) {
+                handShape = HandShape.Staff;   
+            } else {
+                handShape = HandShape.Fist;
+            }
         }
+
+        if (lhs != handShape) {
+            // hand shape has changed:
+            fistCollider.enabled = handShape == HandShape.Fist;
+            swordCollider.enabled = handShape == HandShape.Sword || handShape == HandShape.SwordStaff;
+            staffCollider.enabled = handShape == HandShape.Staff || handShape == HandShape.SwordStaff;
+        }
+
         SetDimension();
     }
 
@@ -105,11 +146,56 @@ public class Fist : VertexColored {
         zOfs += upLength / 2.0f;
 
         float ratio = Mathf.Clamp((len - defaultFistRadius) / (maxLength * 1.0f), 0.0f, 1.0f);
-        float thickness = defaultFistRadius * (1.0f - ratio * (1.0f - defaultFistRadius)));
+        float thickness = defaultFistRadius * (1.0f - ratio * (1.0f - defaultFistRadius) );
 
         sphere.transform.localScale = new Vector3(thickness, thickness, len);
         sphere.transform.localPosition = new Vector3(0.0f, 0.0f, zOfs);
     }
 
+    ISmashable GetFirstSmashableFromCollider(Collider coll) {
+        MonoBehaviour[] list = coll.gameObject.GetComponents<MonoBehaviour>();
+        foreach(MonoBehaviour mb in list)
+            if (mb is ISmashable) 
+                return mb as ISmashable;
+        return null;
+    }
 
+    void OnTriggerEnter(Collider triggerCollider) {
+        ISmashable smashable = GetFirstSmashableFromCollider(triggerCollider);
+        if (smashable == null) 
+            return;
+
+        Vector3 smashVelocity, sliceVelocity;
+        hand.GetEstimatedPeakVelocities(out smashVelocity, out sliceVelocity);
+
+        SmashInfo info = new SmashInfo {
+            smashing = true, 
+            handIndex = handIndex,
+            shape = handShape,
+            posiion = transform.position,   // for fist smashing, use fist position
+            rotation = transform.rotation,   // for staff slice, use rotation 
+            smashVelocity = smashVelocity,
+            sliceVelocity = sliceVelocity
+        };
+
+        smashable.SmashHit(info);
+    }
+
+    void OnTriggerExit(Collider triggerCollider) {
+        ISmashable smashable = GetFirstSmashableFromCollider(triggerCollider);
+        if (smashable == null) 
+            return;
+
+        SmashInfo info = new SmashInfo {
+            smashing = false, 
+            handIndex = handIndex,
+            shape = handShape,
+            posiion = transform.position,   // for fist smashing, use fist position
+            rotation = transform.rotation,   // for staff slice, use rotation 
+            smashVelocity = Vector3.zero,
+            sliceVelocity = Vector3.zero
+        };
+
+        smashable.SmashHit(info);
+    }
 }
