@@ -14,6 +14,7 @@ public enum HandShape {
 }
 
 public struct SmashInfo {
+    public Fist fist;
     public bool smashing;
     public int handIndex;
     public HandShape shape;
@@ -33,6 +34,7 @@ public class Fist : VertexColored {
 
     public SteamVR_Action_Boolean grabPinchAction = SteamVR_Input.GetAction<SteamVR_Action_Boolean>("GrabPinch");
     public SteamVR_Action_Boolean grabGripAction = SteamVR_Input.GetAction<SteamVR_Action_Boolean>("GrabGrip");
+    public HandShape handShape = HandShape.Fist;
 
     private const float zOffset = -0.07f;
     private const float maxLength = 1.3f;
@@ -47,7 +49,6 @@ public class Fist : VertexColored {
     public BoxCollider staffCollider;
 
     private SteamVR_Input_Sources inputSource = 0;
-    private HandShape handShape = HandShape.Fist;
 
     const float defaultFistRadius = 0.2f;
 
@@ -169,6 +170,7 @@ public class Fist : VertexColored {
         hand.GetEstimatedPeakVelocities(out smashVelocity, out sliceVelocity);
 
         SmashInfo info = new SmashInfo {
+            fist = this,
             smashing = true, 
             handIndex = handIndex,
             shape = handShape,
@@ -187,6 +189,7 @@ public class Fist : VertexColored {
             return;
 
         SmashInfo info = new SmashInfo {
+            fist = this,
             smashing = false, 
             handIndex = handIndex,
             shape = handShape,

@@ -19,7 +19,10 @@ public class Orb : VertexColored, ISmashable
     private Quaternion[] collideRotation = {Quaternion.identity, Quaternion.identity};
     private bool[] collideFlag = {false, false};
     private bool colliding;
-    private SmashInfo lastSmashInfo = new SmashInfo { shape = HandShape.Unknown };
+    private SmashInfo[] lastSmashInfo = {
+        new SmashInfo { shape = HandShape.Fist }, 
+        new SmashInfo { shape = HandShape.Fist }
+    };
 
     void Start() {
         InitMesh(gameObject);
@@ -41,7 +44,7 @@ public class Orb : VertexColored, ISmashable
 
         float mag, strength;     
 
-        if (colliding) {
+        if (colliding && collideFlag[info.handIndex] == false) {
             // collide 
             ParticleSystem.MainModule main = hitFX.main;
             collideFlag[info.handIndex] = true;
@@ -50,7 +53,6 @@ public class Orb : VertexColored, ISmashable
             case HandShape.Fist:
                 mag = info.smashVelocity.magnitude;
                 strength = Mathf.Clamp( (mag * mag + mag) * 0.3f, 0.0f, 1.0f );
-                collideDist[info.handIndex] = Vector3.Distance(bodyCenter, info.posiion);
 
                 sparkIntensity = strength * 1.0f;
                 Vibrate(strength, sources[info.handIndex]);
@@ -63,6 +65,8 @@ public class Orb : VertexColored, ISmashable
                     0.1f  * info.smashVelocity.z
                     ); 
                 transform.position += move;
+                collideDist[info.handIndex] = Vector3.Distance(bodyCenter, info.posiion - move);
+                collideRotation[info.handIndex] = info.rotation;
 
                 break;
 
@@ -71,6 +75,7 @@ public class Orb : VertexColored, ISmashable
             case HandShape.SwordStaff:
                 mag = info.sliceVelocity.magnitude * 0.5f;
                 strength = Mathf.Clamp( (mag * mag + mag) * 0.3f, 0.0f, 1.0f );
+                collideDist[info.handIndex] = Vector3.Distance(bodyCenter, info.posiion);
                 collideRotation[info.handIndex] = info.rotation;
 
                 sparkIntensity = strength * 1.0f;
@@ -80,39 +85,59 @@ public class Orb : VertexColored, ISmashable
                 hitFX.Emit( (int)(strength * 30.0f) );
                 break;
             }
-        } else {
-            //  check un-collide
-
-            bool uncollide = false; // (info.shape != lastSmashInfo.shape);
-
-            switch(info.shape) {
-            case HandShape.Fist:
-                if (Vector3.Distance(bodyCenter, info.posiion) < collideDist[info.handIndex]) {
-                    uncollide = true;
-                }
-                break;
-            case HandShape.Staff:
-            case HandShape.Sword:
-            case HandShape.SwordStaff:
-                if (Quaternion.Angle(info.rotation, collideRotation[info.handIndex]) > 45.0f) {
-                    uncollide = true;
-                }
-                break;
-            }
-
-            if (uncollide) {
-                collideFlag[info.handIndex] = true;
-            }
-
         }
 
-        lastSmashInfo = info;
+        lastSmashInfo[info.handIndex] = info;
+    }
+
+    int CheckUncollide (SmashInfo info) {
+        // check if shape has changed
+        if (info.fist.handShape != info.shape) 
+            return 1;
+
+        // check if fist position moved backwards
+        Vector3 bodyCenter = new Vector3(
+            body.position.x,
+            body.position.y + 1.3f, // assumed shoulder height
+            body.position.z); 
+        if (Vector3.Distance(bodyCenter, info.fist.transform.position) < collideDist[info.handIndex]) 
+            return 2;
+
+        // check if rotation did change enough 
+        if (Mathf.Abs(Quaternion.Angle(info.fist.transform.rotation, collideRotation[info.handIndex])) > 30.0f) 
+            return 3;
+
+        return 0;
     }
 
     void Update() {
-        float si = sparkIntensity * 0.9f + 0.1f;  
-        si *= si;
-        Color col = new Color(si,si,si,1.0f);
+
+        for (int handIndex = 0; handIndex < 2; ++handIndex) {
+            if (collideFlag[handIndex]) {
+
+                SmashInfo info = lastSmashInfo[handIndex];
+                int uncollide = CheckUncollide(info);
+
+                if (uncollide > 0) {
+                    collideFlag[info.handIndex] = false;
+                }
+            }
+        }
+
+        Color col;
+        bool collisionDebug = false;
+        if (collisionDebug) {
+            col = new Color(
+                collideFlag[0] ? 1.0f : 0.0f,
+                collideFlag[1] ? 1.0f : 0.0f,
+                0.5f
+            );
+        } else {
+            float si = sparkIntensity * 0.9f + 0.1f;  
+            si *= si;
+            col = new Color(si,si,si,1.0f);
+        }
+
         SetVertexColor(col);
 
         sparkIntensity = Mathf.Clamp(sparkIntensity - 1.5f * Time.deltaTime, 0.0f, 2.0f );
