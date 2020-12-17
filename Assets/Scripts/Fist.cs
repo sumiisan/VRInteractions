@@ -30,7 +30,7 @@ interface ISmashable {
 
 public class Fist : VertexColored {
     Hand hand;
-    int handIndex;
+    public int handIndex;
 
     public SteamVR_Action_Boolean grabPinchAction = SteamVR_Input.GetAction<SteamVR_Action_Boolean>("GrabPinch");
     public SteamVR_Action_Boolean grabGripAction = SteamVR_Input.GetAction<SteamVR_Action_Boolean>("GrabGrip");
@@ -43,6 +43,9 @@ public class Fist : VertexColored {
 
     private bool grabPinchActive = false;
     private bool grabGripActive = false;
+    
+    public float verticalPowerCharge  = 0.0f;
+    private Rigidbody body;
 
     public SphereCollider fistCollider;
     public BoxCollider swordCollider;
@@ -63,6 +66,7 @@ public class Fist : VertexColored {
     }
 
     void Start() {
+        // fill references
         sphere = transform.GetChild(0).gameObject;      // TODO: make better reference
         InitMesh(sphere);
         hand = GetComponentInParent<Hand>();
@@ -70,6 +74,11 @@ public class Fist : VertexColored {
         SteamVR_Input_Sources [] sources = { SteamVR_Input_Sources.LeftHand, SteamVR_Input_Sources.RightHand };
         inputSource = sources[handIndex];
 
+        GameObject steamVRObject = hand.transform.parent.gameObject;
+        GameObject bodyObject = steamVRObject.transform.Find("BodyCollider").gameObject;
+        body = bodyObject.GetComponent<Rigidbody>();
+
+        // init action listeners
         grabPinchAction.AddOnStateDownListener(GrabPinchDown, inputSource);
         grabPinchAction.AddOnStateUpListener(GrabPinchUp, inputSource);
         grabGripAction.AddOnStateDownListener(GrabGripDown, inputSource);
@@ -85,9 +94,65 @@ public class Fist : VertexColored {
         }
     }
 
-    void Update() {
-        float morphSpeed = 10.0f * Time.deltaTime;
 
+    void Update() {
+        Vector3 velocity, angularVelocity;
+        hand.GetEstimatedPeakVelocities(out velocity, out angularVelocity);
+        float magnitude = velocity.magnitude;
+
+        ModifyShape();
+        ChargeVerticalPower(velocity, magnitude);
+        ApplyMovingPower(hand.GetTrackedObjectVelocity(), magnitude);
+    }
+
+    private void GrabPinchDown(SteamVR_Action_Boolean action, SteamVR_Input_Sources source) {
+        grabPinchActive = true;
+    }
+    private void GrabPinchUp(SteamVR_Action_Boolean action, SteamVR_Input_Sources source) {
+        grabPinchActive = false;
+    }
+    private void GrabGripDown(SteamVR_Action_Boolean action, SteamVR_Input_Sources source) {
+        grabGripActive = true;
+    }
+    private void GrabGripUp(SteamVR_Action_Boolean action, SteamVR_Input_Sources source) {
+        grabGripActive = false;
+    }
+
+    void ChargeVerticalPower(Vector3 velocity, float magnitude) {
+        float exponentialFadeFactor = Mathf.Clamp(1.0f - Time.deltaTime * 8.0f, 0.0f, 1.0f); 
+        verticalPowerCharge *= exponentialFadeFactor;
+
+        if (!grabGripActive) 
+            return;
+
+        float verticalPower = Mathf.Abs(velocity.y) + magnitude * 0.5f;
+        verticalPowerCharge += verticalPower;
+
+        float finalVPC = Mathf.Pow(Mathf.Clamp(verticalPowerCharge * 0.03f, 0.0f, 1.0f), 2.0f);
+
+    }
+
+    void ApplyMovingPower(Vector3 velocity, float magnitude) {
+        if (!grabGripActive) 
+            return;
+
+        float vx = velocity.x;
+        float sx = Mathf.Sign(vx);
+        float vz = velocity.z;
+        float sz = Mathf.Sign(vz);
+
+//        Vector3 moveVector = new Vector3(vx, 0.0f, vz);
+        Vector3 moveVector = new Vector3(
+            vx * vx * sx * 0.05f,
+            0.0f,
+            vz * vz * sz * 0.05f
+        );
+
+        MoveIndicator.shared.Trigger(this, moveVector);
+    }
+
+    void ModifyShape() {
+        float morphSpeed = 10.0f * Time.deltaTime;
         upLength   += grabPinchActive ? morphSpeed : -morphSpeed;     
         downLength += grabGripActive  ? morphSpeed : -morphSpeed;
 
@@ -118,19 +183,6 @@ public class Fist : VertexColored {
         }
 
         SetDimension();
-    }
-
-    private void GrabPinchDown(SteamVR_Action_Boolean action, SteamVR_Input_Sources source) {
-        grabPinchActive = true;
-    }
-    private void GrabPinchUp(SteamVR_Action_Boolean action, SteamVR_Input_Sources source) {
-        grabPinchActive = false;
-    }
-    private void GrabGripDown(SteamVR_Action_Boolean action, SteamVR_Input_Sources source) {
-        grabGripActive = true;
-    }
-    private void GrabGripUp(SteamVR_Action_Boolean action, SteamVR_Input_Sources source) {
-        grabGripActive = false;
     }
 
     void SetDimension() {

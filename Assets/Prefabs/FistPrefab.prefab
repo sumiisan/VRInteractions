@@ -135,6 +135,7 @@ MonoBehaviour:
   grabGripAction:
     actionPath: /actions/default/in/GrabGrip
     needsReinit: 0
+  handShape: 0
   fistCollider: {fileID: 5269670736866111797}
   swordCollider: {fileID: 3396811611322801998}
   staffCollider: {fileID: 3724680491060401871}
