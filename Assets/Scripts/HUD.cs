@@ -11,6 +11,7 @@ public class HUD : MonoBehaviour {
     // Start is called before the first frame update
     void Start() {
        shared = this;
+       text.text = "HUD Inited.";
     } 
 
     public void SetProp(string name, string value) {

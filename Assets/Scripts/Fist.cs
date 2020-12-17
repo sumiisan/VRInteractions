@@ -30,7 +30,7 @@ interface ISmashable {
 
 public class Fist : VertexColored {
     Hand hand;
-    int handIndex;
+    public int handIndex;
 
     public SteamVR_Action_Boolean grabPinchAction = SteamVR_Input.GetAction<SteamVR_Action_Boolean>("GrabPinch");
     public SteamVR_Action_Boolean grabGripAction = SteamVR_Input.GetAction<SteamVR_Action_Boolean>("GrabGrip");
@@ -43,7 +43,9 @@ public class Fist : VertexColored {
 
     private bool grabPinchActive = false;
     private bool grabGripActive = false;
-    private float verticalPowerCharge  = 0.0f;
+    
+    public float verticalPowerCharge  = 0.0f;
+    private Rigidbody body;
 
     public SphereCollider fistCollider;
     public BoxCollider swordCollider;
@@ -64,6 +66,7 @@ public class Fist : VertexColored {
     }
 
     void Start() {
+        // fill references
         sphere = transform.GetChild(0).gameObject;      // TODO: make better reference
         InitMesh(sphere);
         hand = GetComponentInParent<Hand>();
@@ -71,6 +74,11 @@ public class Fist : VertexColored {
         SteamVR_Input_Sources [] sources = { SteamVR_Input_Sources.LeftHand, SteamVR_Input_Sources.RightHand };
         inputSource = sources[handIndex];
 
+        GameObject steamVRObject = hand.transform.parent.gameObject;
+        GameObject bodyObject = steamVRObject.transform.Find("BodyCollider").gameObject;
+        body = bodyObject.GetComponent<Rigidbody>();
+
+        // init action listeners
         grabPinchAction.AddOnStateDownListener(GrabPinchDown, inputSource);
         grabPinchAction.AddOnStateUpListener(GrabPinchUp, inputSource);
         grabGripAction.AddOnStateDownListener(GrabGripDown, inputSource);
@@ -88,8 +96,13 @@ public class Fist : VertexColored {
 
 
     void Update() {
+        Vector3 velocity, angularVelocity;
+        hand.GetEstimatedPeakVelocities(out velocity, out angularVelocity);
+        float magnitude = velocity.magnitude;
+
         ModifyShape();
-        ChargeVerticalPower();
+        ChargeVerticalPower(velocity, magnitude);
+        ApplyMovingPower(hand.GetTrackedObjectVelocity(), magnitude);
     }
 
     private void GrabPinchDown(SteamVR_Action_Boolean action, SteamVR_Input_Sources source) {
@@ -105,20 +118,37 @@ public class Fist : VertexColored {
         grabGripActive = false;
     }
 
-    void ChargeVerticalPower() {
+    void ChargeVerticalPower(Vector3 velocity, float magnitude) {
+        float exponentialFadeFactor = Mathf.Clamp(1.0f - Time.deltaTime * 8.0f, 0.0f, 1.0f); 
+        verticalPowerCharge *= exponentialFadeFactor;
 
-        verticalPowerCharge *= Mathf.Clamp(1.0f - Time.deltaTime * 1.5f, 0.0f, 1.0f);
-/*
         if (!grabGripActive) 
             return;
 
-        Vector3 velocity, angularVelocity;
-        hand.GetEstimatedPeakVelocities(out velocity, out angularVelocity);
-
-        float verticalPower = Mathf.Abs(velocity.y) + velocity.magnitude * 0.5f;
+        float verticalPower = Mathf.Abs(velocity.y) + magnitude * 0.5f;
         verticalPowerCharge += verticalPower;
-*/
-        //HUD.shared.SetProp("VerticalPower", verticalPower.ToString());
+
+        float finalVPC = Mathf.Pow(Mathf.Clamp(verticalPowerCharge * 0.03f, 0.0f, 1.0f), 2.0f);
+
+    }
+
+    void ApplyMovingPower(Vector3 velocity, float magnitude) {
+        if (!grabGripActive) 
+            return;
+
+        float vx = velocity.x;
+        float sx = Mathf.Sign(vx);
+        float vz = velocity.z;
+        float sz = Mathf.Sign(vz);
+
+//        Vector3 moveVector = new Vector3(vx, 0.0f, vz);
+        Vector3 moveVector = new Vector3(
+            vx * vx * sx * 0.05f,
+            0.0f,
+            vz * vz * sz * 0.05f
+        );
+
+        MoveIndicator.shared.Trigger(this, moveVector);
     }
 
     void ModifyShape() {
