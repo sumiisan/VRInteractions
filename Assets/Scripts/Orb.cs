@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Audio;
 using Valve.VR;
 using Valve.VR.InteractionSystem;
 
@@ -12,6 +13,9 @@ public class Orb : VertexColored, ISmashable
     public Transform body;
     public ParticleSystem hitFX;
     public SteamVR_Action_Vibration haptic;
+    public AudioClip [] sfx; 
+
+    private AudioSource audioSource;
 
     private Vector3 origin;
     private float sparkIntensity = 0.0f;
@@ -27,6 +31,7 @@ public class Orb : VertexColored, ISmashable
     void Start() {
         InitMesh(gameObject);
         origin = transform.position;
+        audioSource = GetComponent<AudioSource>();
     }
 
     void Vibrate(float strength, SteamVR_Input_Sources source) {
@@ -42,7 +47,7 @@ public class Orb : VertexColored, ISmashable
              body.position.y + 1.3f, // assumed shoulder height
              body.position.z); 
 
-        float mag, strength;     
+        float mag, strength = 0.0f;  
 
         if (colliding && collideFlag[info.handIndex] == false) {
             // collide 
@@ -51,8 +56,8 @@ public class Orb : VertexColored, ISmashable
 
             switch (info.shape) {
             case HandShape.Fist:
-                mag = info.smashVelocity.magnitude;
-                strength = Mathf.Clamp( (mag * mag + mag) * 0.3f, 0.0f, 1.0f );
+                mag = info.smashVelocity.magnitude * 0.3f;
+                strength = Mathf.Clamp( (mag * mag + mag), 0.0f, 1.0f );
 
                 sparkIntensity = strength * 1.0f;
                 Vibrate(strength, sources[info.handIndex]);
@@ -73,8 +78,8 @@ public class Orb : VertexColored, ISmashable
             case HandShape.Staff:
             case HandShape.Sword:
             case HandShape.SwordStaff:
-                mag = info.sliceVelocity.magnitude * 0.5f;
-                strength = Mathf.Clamp( (mag * mag + mag) * 0.3f, 0.0f, 1.0f );
+                mag = info.sliceVelocity.magnitude * 0.01f;
+                strength = Mathf.Clamp( (mag * mag + mag), 0.0f, 1.0f );
                 collideDist[info.handIndex] = Vector3.Distance(bodyCenter, info.posiion);
                 collideRotation[info.handIndex] = info.rotation;
 
@@ -85,9 +90,18 @@ public class Orb : VertexColored, ISmashable
                 hitFX.Emit( (int)(strength * 30.0f) );
                 break;
             }
+
+            // sound:
+            int sfxIndex = (int)((float)(sfx.Length - 1) * Mathf.Pow(strength, 2.0f));
+            print(sfxIndex);
+            AudioClip clip = sfx[sfxIndex];
+            audioSource.PlayOneShot(clip);
+
         }
 
         lastSmashInfo[info.handIndex] = info;
+
+
     }
 
     int CheckUncollide (SmashInfo info) {
@@ -117,7 +131,7 @@ public class Orb : VertexColored, ISmashable
 
                 SmashInfo info = lastSmashInfo[handIndex];
                 int uncollide = CheckUncollide(info);
-
+                
                 if (uncollide > 0) {
                     collideFlag[info.handIndex] = false;
                 }

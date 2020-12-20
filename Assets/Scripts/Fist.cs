@@ -31,6 +31,7 @@ interface ISmashable {
 public class Fist : VertexColored {
     Hand hand;
     public int handIndex;
+    public float moveSensitivity = 1.5f;
 
     public SteamVR_Action_Boolean grabPinchAction = SteamVR_Input.GetAction<SteamVR_Action_Boolean>("GrabPinch");
     public SteamVR_Action_Boolean grabGripAction = SteamVR_Input.GetAction<SteamVR_Action_Boolean>("GrabGrip");
@@ -44,7 +45,7 @@ public class Fist : VertexColored {
     private bool grabPinchActive = false;
     private bool grabGripActive = false;
     
-    public float verticalPowerCharge  = 0.0f;
+    public float [] verticalPowerCharge  = { 0.0f, 0.0f };
     private Rigidbody body;
 
     public SphereCollider fistCollider;
@@ -96,13 +97,12 @@ public class Fist : VertexColored {
 
 
     void Update() {
-        Vector3 velocity, angularVelocity;
-        hand.GetEstimatedPeakVelocities(out velocity, out angularVelocity);
+        Vector3 velocity = hand.GetTrackedObjectVelocity();
         float magnitude = velocity.magnitude;
 
         ModifyShape();
         ChargeVerticalPower(velocity, magnitude);
-        ApplyMovingPower(hand.GetTrackedObjectVelocity(), magnitude);
+        ApplyMovingPower(velocity, magnitude);
     }
 
     private void GrabPinchDown(SteamVR_Action_Boolean action, SteamVR_Input_Sources source) {
@@ -118,18 +118,23 @@ public class Fist : VertexColored {
         grabGripActive = false;
     }
 
+    public void ResetVerticalPowerCharge() {
+        verticalPowerCharge[0] = 0.0f;
+        verticalPowerCharge[1] = 0.0f;
+    }
+
     void ChargeVerticalPower(Vector3 velocity, float magnitude) {
-        float exponentialFadeFactor = Mathf.Clamp(1.0f - Time.deltaTime * 8.0f, 0.0f, 1.0f); 
-        verticalPowerCharge *= exponentialFadeFactor;
+        float exponentialFadeFactor = Mathf.Clamp(1.0f - Time.deltaTime * 8.0f, 0.0f, 1.0f);
+        verticalPowerCharge[0] *= exponentialFadeFactor;
+        verticalPowerCharge[1] *= exponentialFadeFactor;
 
         if (!grabGripActive) 
             return;
 
-        float verticalPower = Mathf.Abs(velocity.y) + magnitude * 0.5f;
-        verticalPowerCharge += verticalPower;
-
-        float finalVPC = Mathf.Pow(Mathf.Clamp(verticalPowerCharge * 0.03f, 0.0f, 1.0f), 2.0f);
-
+        verticalPowerCharge[velocity.y < 0 ? 0 : 1] += (Mathf.Abs(velocity.y) + magnitude) * moveSensitivity * Time.deltaTime;
+        if(handIndex == 0) {
+            HUD.shared.SetProp("VPC", $"vel:{velocity.y:N2},mag:{magnitude:N2} \n({verticalPowerCharge[0]:N2},{verticalPowerCharge[1]:N2})");
+        }
     }
 
     void ApplyMovingPower(Vector3 velocity, float magnitude) {
