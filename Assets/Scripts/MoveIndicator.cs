@@ -7,6 +7,7 @@ using Valve.VR.InteractionSystem;
 public class MoveIndicator : MonoBehaviour {
     public static MoveIndicator shared;
     private MeshRenderer indicatorRenderer;
+    private AudioSource audioSource;
     private Vector3 moveVelocity; 
     private Vector3 [] moveForce = {new Vector3(), new Vector3()};
     private Fist [] fists = { null, null };
@@ -15,6 +16,7 @@ public class MoveIndicator : MonoBehaviour {
     void Start() {
         shared = this;
         indicatorRenderer = GetComponent<MeshRenderer>();
+        audioSource = GetComponent<AudioSource>();
         indicatorRenderer.enabled = false;
     }
 
@@ -23,59 +25,50 @@ public class MoveIndicator : MonoBehaviour {
             return 0.0f;
         if (fists[1] == null)
             return 0.0f;
-        return fists[0].verticalPowerCharge * fists[1].verticalPowerCharge;
+
+        float vpc0 = fists[0].verticalPowerCharge[0] * fists[1].verticalPowerCharge[0];
+        float vpc1 = fists[0].verticalPowerCharge[1] * fists[1].verticalPowerCharge[1];
+
+        return vpc0 > vpc1 ? vpc0 : vpc1 * -1.0f;
     }
 
     public void Trigger(Fist fist, Vector3 force) {
         fists[fist.handIndex] = fist;
 
+        float pvpc = ProductVertPC();
+        HUD.shared.SetProp("VertPC", pvpc.ToString());
+
         if (indicatorRenderer.enabled)
             return;
 
-        if (force.magnitude == 0) {
-//            HUD.shared.SetProp("s","NULL FORCE!");
-        } else {
-            moveForce[fist.handIndex] = force;
-        }
-
-//        HUD.shared.SetProp("F" + handIndex, $"({vx:N2},{vz:N2})");
-/*
-        HUD.shared.SetProp("F0", $"({moveForce[0].x:N2},{moveForce[0].z:N2}) {gameObject.GetInstanceID()}");
-        HUD.shared.SetProp("F1", $"({moveForce[1].x:N2},{moveForce[1].z:N2}) {gameObject.GetInstanceID()}");
-*/
-        float pvpc = ProductVertPC();
-
-        if (HUD.shared == null) {
-            Debug.Log("HUD not inited!");
-        } else {
-            HUD.shared.SetProp("VertPC", pvpc.ToString());
-        }
+        moveForce[fist.handIndex] = force;
 
         bool moveToHeadDirection = true;
 
-        if (pvpc > 1.0f) {
+        if (Mathf.Abs(pvpc) > 1.0f) {
+            //triggered
+
             indicatorRenderer.enabled = true;
 
-            fists[0].verticalPowerCharge = 0.0f;
-            fists[1].verticalPowerCharge = 0.0f;
+            fists[0].ResetVerticalPowerCharge();
+            fists[1].ResetVerticalPowerCharge();
+
+//            float sign = Mathf.Sign(pvpc);
 
             moveVelocity = new Vector3(
-                moveForce[0].x + moveForce[1].x,
+                (moveForce[0].x + moveForce[1].x) * pvpc * 2.0f,
                 moveForce[0].y + moveForce[1].y,
-                moveForce[0].z + moveForce[1].z
+                (moveForce[0].z + moveForce[1].z) * pvpc * 2.0f
             );
 
             if (moveToHeadDirection) {
-                moveVelocity = Player.instance.hmdTransforms[0].forward * moveVelocity.magnitude;
+                moveVelocity = Player.instance.hmdTransforms[0].forward * moveVelocity.magnitude * pvpc * 2.0f;
                 moveVelocity.y = 0.0f;
             } 
 
             transform.position = Player.instance.hmdTransforms[0].position + new Vector3(0.0f, -0.3f, 0.0f);
-            HUD.shared.SetProp("MI", "TRIGGERED");
-        } else {
-            HUD.shared.SetProp("MI", "WEAK");
+            audioSource.PlayOneShot(audioSource.clip);
         }
-
     }
 
     // Update is called once per frame
@@ -86,10 +79,10 @@ public class MoveIndicator : MonoBehaviour {
         moveVelocity *= exponentialFadeFactor;
 
         if (moveVelocity.magnitude < 0.01f) {
+            // position determined
             indicatorRenderer.enabled = false;
-            HUD.shared.SetProp("MI", "-");
-        } else if (indicatorRenderer.enabled) {
-            HUD.shared.SetProp("MI", "MAG:" + moveVelocity.magnitude);
+
+            // do actual avatar move here:
         }
     }
 }

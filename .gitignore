@@ -14,3 +14,4 @@ obj/
 *.csproj
 *.sln
 .vscode/settings.json
+.vscode/launch.json
