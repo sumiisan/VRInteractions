@@ -66,23 +66,29 @@ public class MoveIndicator : MonoBehaviour {
                 moveVelocity.y = 0.0f;
             } 
 
-            transform.position = Player.instance.hmdTransforms[0].position + new Vector3(0.0f, -0.3f, 0.0f);
+            transform.position = Player.instance.hmdTransforms[0].position + new Vector3(0.0f, -0.1f, 0.0f);
             audioSource.PlayOneShot(audioSource.clip);
         }
     }
 
     // Update is called once per frame
     void Update() {
-        transform.position += moveVelocity;
+        //        transform.position += moveVelocity;
+        Player.instance.transform.position += moveVelocity;
 
-        float exponentialFadeFactor = Mathf.Clamp(1.0f - Time.deltaTime * 8.0f, 0.0f, 1.0f); 
+        float exponentialFadeFactor = Mathf.Clamp(1.0f - Time.deltaTime * 7.0f, 0.0f, 1.0f); 
         moveVelocity *= exponentialFadeFactor;
 
         if (moveVelocity.magnitude < 0.01f) {
             // position determined
-            indicatorRenderer.enabled = false;
+            if(indicatorRenderer.enabled) {
+                indicatorRenderer.enabled = false;
 
-            // do actual avatar move here:
+                // do actual avatar move here:
+
+//                Vector3 targetPos = transform.position - Player.instance.hmdTransforms[0].position;
+//                Player.instance.transform.position = targetPos;
+            }
         }
     }
 }
